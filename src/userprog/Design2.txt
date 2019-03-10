@@ -1,0 +1,299 @@
++--------------------------+
+|         CIS 520          |
+| PROJECT 2: USER PROGRAMS |
+|     DESIGN DOCUMENT      |
++--------------------------+
+
+---- GROUP ----
+
+>> Fill in the names of your group members.
+
+Jared Wolfe
+Jie Zheng
+Fubin Luan
+
+---- PRELIMINARIES ----
+
+>> If you have any preliminary comments on your submission, notes for the
+>> TAs, or extra credit, please give them here.
+
+>> Please cite any offline or online sources you consulted while
+>> preparing your submission, other than the Pintos documentation, course
+>> text, lecture notes, and course staff.
+
+ARGUMENT PASSING
+================
+
+---- DATA STRUCTURES ----
+
+>> A1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+---- ALGORITHMS ----
+
+>> A2: Briefly describe how you implemented argument parsing.  How do
+>> you arrange for the elements of argv[] to be in the right order?
+>> How do you avoid overflowing the stack page?
+
+We implemented argument parsing by using strtok_r method extract each
+argument separated by space and put each argument to esp pointer by
+using memcpy method. As for the arrangement, we first placed the
+elements in stack from left to right and record each element’s location
+in an array. Then we have those locations of elements putted into stack
+from right left to ensure the arguments are executed in right order.
+We avoid overflowing the stack page by moving esp pointer based on the
+size of each element.
+
+
+---- RATIONALE ----
+
+>> A3: Why does Pintos implement strtok_r() but not strtok()?
+
+The strtok_r() method requires a save_ptr to be provided by the caller.
+We need to store the arguments for later user as the kernel separates
+commands from the arguments. In the case of preemption, the strtok()
+method is unsafe as it stores the pointer internally.
+
+>> A4: In Pintos, the kernel separates commands into an executable name
+>> and arguments.  In Unix-like systems, the shell does this
+>> separation.  Identify at least two advantages of the Unix approach.
+
+Advantages:
+1.With the Unix approach , the kernel is smaller. with the microkernel approach,
+the kernel is more reliable.
+2.when we want to extend the function or change the function of separate command,
+with Unix approach, it will more convenient and with less code to change.
+3.The Unix approach is sager, because the commands is separated in the shell, not
+in the kernel, so it will not affect the kernel.
+4.the Unix approach is faster, because it don't have to switch to the kernel mode
+to separate the command.
+
+
+SYSTEM CALLS
+============
+
+---- DATA STRUCTURES ----
+
+>> B1: Copy here the declaration of each new or changed `struct' or
+>> `struct' member, global or static variable, `typedef', or
+>> enumeration.  Identify the purpose of each in 25 words or less.
+
+
+under thread.h:
+
+struct list child_proc;  /*list to keep track of child processes*/
+
+struct thread* parent;   /*track of parent processes*/
+
+struct file *self;	/*track of current thread's file, initial to be NULL*/
+
+struct list files;	/*list of total files that opened with*/
+
+int fd_count;	/*number of fd,initial to be 2*/
+
+struct semaphore child_lock;	/*up if there are child used, down if not*/
+
+int waitingon;	/*track of the tid it's w8ing for, initial to be 0*/
+
+struct child {
+int tid;
+struct list_elem elem;
+int exit_error;
+bool used;
+};	/*for child process*/
+
+under syscall.c:
+
+struct proc_file {
+struct file* ptr;
+int fd;
+struct list_elem elem;
+};	/*a useful struct*/
+
+
+>> B2: Describe how file descriptors are associated with open files.
+>> Are file descriptors unique within the entire OS or just within a
+>> single process?
+
+Just like the struct we mentioned above, we use ptr to track the current file that
+we are open with, and for the variable fd, it keep track of how much fd current thread
+hold. every time we opened a new file, we set it in our ptr, and fd to how much fd
+current thread hold, and we add 1 to current thread. for each different process,
+our ptr and fd can be different, which means that they are unique with a single process.
+but the structure is unique within the entire OS.
+
+
+---- ALGORITHMS ----
+
+>> B3: Describe your code for reading and writing user data from the
+>> kernel.
+
+case SYS_READ:
+check_addr(p+7);
+check_addr(*(p+6));
+if(*(p+5)==0)
+{
+int i;
+uint8_t* buffer = *(p+6);
+for(i=0;i<*(p+7);i++)
+buffer[i] = input_getc();
+f->eax = *(p+7);
+}
+else
+{
+struct proc_file* fptr = list_search(&thread_current()->files, *(p+5));
+if(fptr==NULL)
+f->eax=-1;
+else
+{
+acquire_filesys_lock();
+f->eax = file_read (fptr->ptr, *(p+6), *(p+7));
+release_filesys_lock();
+}
+}
+break;
+for read:
+1st we call check_add for p+7 and *(p+6), which is the correlated arguments. then we see if*(p+5) is 0,
+if it is, which means that STDIN_FILENO, then we set out buffer, and use input_getc() to read, after
+that we set our eax to *(p+7). if it's not, it means that STDOUT_FILENO, we first check that if current
+file we used, if not, we reset the call frame, if it is, we lock the file and call the file_read
+with it, after that we release the lock.
+
+case SYS_WRITE:
+check_addr(p+7);
+check_addr(*(p+6));
+if(*(p+5)==1)
+{
+putbuf(*(p+6),*(p+7));
+f->eax = *(p+7);
+}
+else
+{
+struct proc_file* fptr = list_search(&thread_current()->files, *(p+5));
+if(fptr==NULL)
+f->eax=-1;
+else
+{
+acquire_filesys_lock();
+f->eax = file_write (fptr->ptr, *(p+6), *(p+7));
+release_filesys_lock();
+}
+}
+break;
+for write:
+we do the same first step like read, check_add for p+7 and*(p+6),then we check if it's STDIN_FILENO
+if it is not(*(p+5) == 1), we use putbuf(),, if not, it means that STDOUT_FILENO, we check if the
+current file was used, if not, we reset the frame's eax. if it is, we acquire a lock, and call the
+file_write function to write first. after that we release the lock.
+
+>> B4: Suppose a system call causes a full page (4,096 bytes) of data
+>> to be copied from user space into the kernel.  What is the least
+>> and the greatest possible number of inspections of the page table
+>> (e.g. calls to pagedir_get_page()) that might result?  What about
+>> for a system call that only copies 2 bytes of data?  Is there room
+>> for improvement in these numbers, and how much?
+
+In both cases, there have to be at least one call and at most two call.
+because the content can be in one page, or spread to two pages. it can
+be improved to 1 page.
+
+
+>> B5: Briefly describe your implementation of the "wait" system call
+>> and how it interacts with process termination.
+
+We implemented argument parsing by using strtok_r method extract each
+argument separated by space and put each argument to esp pointer by
+using memcpy method. As for the arrangement, we first placed the elements
+in stack from left to right and record each element’s location in an array.
+Then we have those locations of elements putted into stack from right left
+to ensure the arguments are executed in right order. We avoid overflowing
+the stack page by moving esp pointer based on the size of each element.
+
+
+>> B6: Any access to user program memory at a user-specified address
+>> can fail due to a bad pointer value.  Such accesses must cause the
+>> process to be terminated.  System calls are fraught with such
+>> accesses, e.g. a "write" system call requires reading the system
+>> call number from the user stack, then each of the call's three
+>> arguments, then an arbitrary amount of user memory, and any of
+>> these can fail at any point.  This poses a design and
+>> error-handling problem: how do you best avoid obscuring the primary
+>> function of code in a morass of error-handling?  Furthermore, when
+>> an error is detected, how do you ensure that all temporarily
+>> allocated resources (locks, buffers, etc.) are freed?  In a few
+>> paragraphs, describe the strategy or strategies you adopted for
+>> managing these issues.  Give an example.
+
+So we have page fault handling method in exception file that handles
+such errors. In this way, we avoided obscuring the primary function
+and also increased code reusability.
+
+---- SYNCHRONIZATION ----
+
+>> B7: The "exec" system call returns -1 if loading the new executable
+>> fails, so it cannot return before the new executable has completed
+>> loading.  How does your code ensure this?  How is the load
+>> success/failure status passed back to the thread that calls "exec"?
+
+>> B8: Consider parent process P with child process C.  How do you
+>> ensure proper synchronization and avoid race conditions when P
+>> calls wait(C) before C exits?  After C exits?  How do you ensure
+>> that all resources are freed in each case?  How about when P
+>> terminates without waiting, before C exits?  After C exits?  Are
+>> there any special cases?
+
+---- RATIONALE ----
+
+>> B9: Why did you choose to implement access to user memory from the
+>> kernel in the way that you did?
+
+The check_addr(const void *vaddr) function in system_call.c handles validation
+of access to user memory.  It first uses the is_user_vaddr to ensure the address
+is in the range of user virtual addressees. pagedir_get_page() looks up the
+physical address that corresponds to user virtual address UADDR in PD.  It
+returns the kernel virtual address corresponding to that physical address, or a
+null pointer if UADDR is unmapped. The process exits if the given address is
+invalid.
+
+>> B10: What advantages or disadvantages can you see to your design
+>> for file descriptors?
+
+The struct proc_file contains an int for file descriptor.  With every new file,
+we need to make sure the current thread increments the fd_count int. To close a
+file or search for a file, we need to iterate through all open files until the
+desired file is found. We could possibly optimize this in the future by using
+a search algorithm instead. An advantage to this approach is that we have
+information about the currently opened files in the thread struct as a simple
+count using an int.
+
+>> B11: The default tid_t to pid_t mapping is the identity mapping.
+>> If you changed it, what advantages are there to your approach?
+
+We did not make changes to the default mapping. To simplify, we could have
+used direct mapping since multiple threads do not run on this operating
+system.
+
+SURVEY QUESTIONS
+================
+
+Answering these questions is optional, but it will help us improve the
+course in future quarters.  Feel free to tell us anything you
+want--these questions are just to spur your thoughts.  You may also
+choose to respond anonymously in the course evaluations at the end of
+the quarter.
+
+>> In your opinion, was this assignment, or any one of the three problems
+>> in it, too easy or too hard?  Did it take too long or too little time?
+
+>> Did you find that working on a particular part of the assignment gave
+>> you greater insight into some aspect of OS design?
+
+>> Is there some particular fact or hint we should give students in
+>> future quarters to help them solve the problems?  Conversely, did you
+>> find any of our guidance to be misleading?
+
+>> Do you have any suggestions for the TAs to more effectively assist
+>> students, either for future quarters or the remaining projects?
+
+>> Any other comments?
