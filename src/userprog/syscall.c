@@ -20,13 +20,13 @@ struct proc_file {
 };
 
 void
-syscall_init (void) 
+syscall_init (void)
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
 static void
-syscall_handler (struct intr_frame *f UNUSED) 
+syscall_handler (struct intr_frame *f UNUSED)
 {
   int * p = f->esp;
 
@@ -183,7 +183,7 @@ int exec_proc(char *file_name)
 	acquire_filesys_lock();
 	char * fn_cp = malloc (strlen(file_name)+1);
 	  strlcpy(fn_cp, file_name, strlen(file_name)+1);
-	  
+
 	  char * save_ptr;
 	  fn_cp = strtok_r(fn_cp," ",&save_ptr);
 
@@ -227,13 +227,17 @@ void exit_proc(int status)
 	thread_exit();
 }
 
+/* Check that a user virtual address is valid, exit otherwise*/
 void* check_addr(const void *vaddr)
 {
+	// exit if address not in user virtual memory space
 	if (!is_user_vaddr(vaddr))
 	{
 		exit_proc(-1);
 		return 0;
 	}
+	/* look up the corresponding physical address, exit if it
+	is unmapped */
 	void *ptr = pagedir_get_page(thread_current()->pagedir, vaddr);
 	if (!ptr)
 	{
@@ -289,7 +293,7 @@ void close_all_files(struct list* files)
 		e = list_pop_front(files);
 
 		struct proc_file *f = list_entry (e, struct proc_file, elem);
-          
+
 	      	file_close(f->ptr);
 	      	list_remove(e);
 	      	free(f);
@@ -297,5 +301,5 @@ void close_all_files(struct list* files)
 
 	}
 
-      
+
 }
