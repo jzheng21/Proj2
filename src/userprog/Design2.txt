@@ -38,6 +38,32 @@ ARGUMENT PASSING
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
+int64_t waketick;
+
+bool success;
+    
+int exit_error;
+
+struct list child_proc;
+struct thread* parent;
+
+struct file *self;
+
+struct list files;
+int fd_count;
+
+struct semaphore child_lock;
+int waitingon;
+
+struct child {
+      int tid;
+      struct list_elem elem;
+      int exit_error;
+      bool used;
+    };
+
+bool cmp_waketick(struct list_elem *first, struct list_elem *second, void *aux);
+
 ---- ALGORITHMS ----
 
 >> A2: Briefly describe how you implemented argument parsing.  How do
