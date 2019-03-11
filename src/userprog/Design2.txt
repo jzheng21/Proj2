@@ -202,13 +202,12 @@ be improved to 1 page.
 >> B5: Briefly describe your implementation of the "wait" system call
 >> and how it interacts with process termination.
 
-We implemented argument parsing by using strtok_r method extract each
-argument separated by space and put each argument to esp pointer by
-using memcpy method. As for the arrangement, we first placed the elements
-in stack from left to right and record each element’s location in an array.
-Then we have those locations of elements putted into stack from right left
-to ensure the arguments are executed in right order. We avoid overflowing
-the stack page by moving esp pointer based on the size of each element.
+For our process_wait, we first search through the thread’s child processes
+to see if there is a corresponding child. If there isn’t, we terminate the
+method with -1 returned. If there is a child existing, then we check if the
+child is still active. If the child is no active, we’ll put the process in
+wait using sema_down. Then we check the exit status of the child and remove
+it from the list and return the exit code.
 
 
 >> B6: Any access to user program memory at a user-specified address
@@ -225,9 +224,11 @@ the stack page by moving esp pointer based on the size of each element.
 >> paragraphs, describe the strategy or strategies you adopted for
 >> managing these issues.  Give an example.
 
-So we have page fault handling method in exception file that handles
-such errors. In this way, we avoided obscuring the primary function
-and also increased code reusability.
+So we have page fault handling method in exception file that handles such errors.
+In this way, we avoided obscuring the primary function and also increased code
+reusability. When an error Is detected, page_fault method will be invoked and 
+kill the process through process_exit. Process_exit will be responsible for
+freeing the resources.
 
 ---- SYNCHRONIZATION ----
 
@@ -236,12 +237,22 @@ and also increased code reusability.
 >> loading.  How does your code ensure this?  How is the load
 >> success/failure status passed back to the thread that calls "exec"?
 
+We used acquire_filesys_lock in places of processing for both fail and
+successful cases to ensure they cannot return before the executable has
+completed loading. We will assign load status to thread’s struct member.
+
 >> B8: Consider parent process P with child process C.  How do you
 >> ensure proper synchronization and avoid race conditions when P
 >> calls wait(C) before C exits?  After C exits?  How do you ensure
 >> that all resources are freed in each case?  How about when P
 >> terminates without waiting, before C exits?  After C exits?  Are
 >> there any special cases?
+
+Process P will wait for its child process C to complete before child
+process completes by sema_down the child process’s lock. In our 
+process_wait function, if child doesn’t exist, we will return -1. If
+it does exist, we will process the child process first and remove child
+process’s occupied resources before return its exit status.
 
 ---- RATIONALE ----
 
@@ -271,7 +282,7 @@ count using an int.
 >> If you changed it, what advantages are there to your approach?
 
 We did not make changes to the default mapping. To simplify, we could have
-used direct mapping since multiple threads do not run on this operating
+used direct mapping since multiple threads per process do not run on this operating
 system.
 
 SURVEY QUESTIONS
