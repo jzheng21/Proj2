@@ -17,9 +17,17 @@ Fubin Luan
 >> If you have any preliminary comments on your submission, notes for the
 >> TAs, or extra credit, please give them here.
 
+Currently getting - 
+gcc: error: –fno-omit-frame-pointer: No such file or directory
+- so this line has been temporarily removed from Make.config
+
 >> Please cite any offline or online sources you consulted while
 >> preparing your submission, other than the Pintos documentation, course
 >> text, lecture notes, and course staff.
+
+https://jerryajay.com/wp-content/uploads/2018/08/Project-2-Review.pdf
+https://github.com/Waqee/Pintos-Project-2/commits
+
 
 ARGUMENT PASSING
 ================
