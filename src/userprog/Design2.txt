@@ -38,31 +38,28 @@ ARGUMENT PASSING
 >> `struct' member, global or static variable, `typedef', or
 >> enumeration.  Identify the purpose of each in 25 words or less.
 
-int64_t waketick;
-
-bool success;
+bool success; // indicates that the process loaded successfully
     
-int exit_error;
+int exit_error; // indicates the type of error if process exits unsuccessfully
 
-struct list child_proc;
-struct thread* parent;
+struct list child_proc; // list of child processes
+struct thread* parent; // the parent process
 
-struct file *self;
+struct file *self; // file currently opened by process
 
-struct list files;
-int fd_count;
+struct list files; // list of all files opened
+int fd_count; // file descriptor for this process
 
-struct semaphore child_lock;
-int waitingon;
+struct semaphore child_lock; // semaphore for child process
+int waitingon; // what process we are currently waiting on
 
-struct child {
+/* child has a thread id, list of child processes, int describing exit error, and bool indicating the child process is still active */
+struct child { 
       int tid;
       struct list_elem elem;
       int exit_error;
       bool used;
     };
-
-bool cmp_waketick(struct list_elem *first, struct list_elem *second, void *aux);
 
 ---- ALGORITHMS ----
 
